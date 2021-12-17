@@ -8,8 +8,9 @@ _exit_w_msg() {
     error echo -e $MSG
     kill -INT $$
 }
+USAGE="Usage: purge_tips [-T<n_threads(64)>] [-e<e_thres(5)>] <hifi.fastq> <out-dir> <hifiasm-options>"
 
-USAGE="Usage: purge_tips [-T<n_threads(64)>] [-e<e_thres(5)>] <hifi.fastq>"
+OPTIND=1
 N_THREADS=64 E_THRES=5
 while getopts :T:e:h OPT; do
     case $OPT in
@@ -19,7 +20,14 @@ while getopts :T:e:h OPT; do
     \?) _exit_w_msg "Illegal option: -$OPTARG" ;;
     esac
 done
-HIFI_FASTQ=${@:$OPTIND:1}
+shift $((OPTIND - 1))
+if [ "$#" -lt 2 ]; then
+    _exit_w_msg "$USAGE"
+    exit 1
+fi
+HIFI_FASTQ=$1
+OUT_DIR=$2
+HIFIASM_OPTS=${@:3}
 if [ ! -f "${HIFI_FASTQ}" ]; then
     _exit_w_msg "File does not exist: ${HIFI_FASTQ}\n${USAGE}"
 fi
@@ -37,7 +45,7 @@ run_hifiasm() {
     # Output
     OUT_BAM=${REF_PREFIX}.${READS_PREFIX}.sorted.bam
     # Command
-    hifiasm -o ${OUT_PREFIX} -t ${N_THREADS} ${READS_FASTQ}
+    hifiasm -o ${OUT_PREFIX} -t ${N_THREADS} ${HIFIASM_OPTS} ${READS_FASTQ}
     for DATA in *tg.gfa; do
         gfatools gfa2fa ${DATA} > ${DATA%.gfa}.fasta
     done
@@ -110,12 +118,7 @@ main() {
     purge_tips ${ASM_GFA} ${READS} ${READS_BAM} ${E_THRES}
 }
 
-COUNTER=1
-while true; do
-    mkdir -p ${COUNTER}/; cd ${COUNTER}/
-    ln -sf ${HIFI_FASTQ} hifi.fastq
-    main hifi.fastq
-    cd ..
-    HIFI_FASTQ=../${COUNTER}/${FILTERED_FASTQ}
-    let COUNTER++
-done
+mkdir -p ${OUT_DIR}/; cd ${OUT_DIR}/
+ln -sf ${HIFI_FASTQ} hifi.fastq
+main hifi.fastq
+cd ..

@@ -1,0 +1,40 @@
+#!/bin/bash
+shopt -s expand_aliases && source ~/.bashrc && set -e || exit 1
+alias error='printf "\033[0;35m[ERROR]\033[0m ";'
+alias warn='printf "\033[0;33m [WARN]\033[0m ";'
+alias info='printf "\033[0;32m [INFO]\033[0m ";'
+_exit_w_msg() {
+    MSG=$1
+    error echo -e $MSG
+    kill -INT $$
+}
+USAGE="Usage: purge_tips_iter [-T<n_threads(64)>] [-e<e_thres(5)>] <hifi.fastq> <hifiasm-options>"
+
+OPTIND=1
+N_THREADS=64 E_THRES=5
+while getopts :T:e:h OPT; do
+    case $OPT in
+    T) N_THREADS=$OPTARG ;;
+    e) E_THRES=$OPTARG ;;
+    h) _exit_w_msg "$USAGE" ;;
+    \?) _exit_w_msg "Illegal option: -$OPTARG" ;;
+    esac
+done
+shift $((OPTIND - 1))
+if [ "$#" -lt 1 ]; then
+    _exit_w_msg "$USAGE"
+    exit 1
+fi
+HIFI_FASTQ=$1
+HIFIASM_OPTS=${@:2}
+if [ ! -f "${HIFI_FASTQ}" ]; then
+    _exit_w_msg "File does not exist: ${HIFI_FASTQ}\n${USAGE}"
+fi
+HIFI_FASTQ=$(readlink -f ${HIFI_FASTQ})
+
+COUNTER=1
+while true; do
+    purge_tips -T${N_THREADS} -e${E_THRES} ${HIFI_FASTQ} ${COUNTER} ${HIFIASM_OPTS} || exit 0
+    HIFI_FASTQ=${COUNTER}/filtered.fastq
+    let COUNTER++
+done
